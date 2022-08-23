@@ -71,20 +71,28 @@ class Executor(object):
 
         """
         torch.manual_seed(seed)
+        # https://pytorch.org/docs/stable/generated/torch.cuda.manual_seed_all.html#torch-cuda-manual-seed-all
         torch.cuda.manual_seed_all(seed)
+        
+        
         np.random.seed(seed)
         random.seed(seed)
+#         https://pytorch.org/docs/stable/notes/randomness.html 
+#         results may not be reproducible between CPU and GPU executions, even when using identical seeds.
+#         https://zhuanlan.zhihu.com/p/141063432 
         torch.backends.cudnn.deterministic = True
 
     def init_control_communication(self):
         """Create communication channel between coordinator and executor.
         This channel serves control messages.
         """
+#         https://github.com/SymbioticLab/FedScale/blob/88ea51a967/fedscale/core/channels/channel_context.py#:~:text=def%20connect_to_server(self)%3A
         self.aggregator_communicator.connect_to_server()
 
     def init_data_communication(self):
         """In charge of jumbo data traffics (e.g., fetch training result)
         """
+#         这里应该是当data traffic足够大时，需要自己去configure调用的
         pass
 
     def init_model(self):
@@ -94,6 +102,7 @@ class Executor(object):
             PyTorch or TensorFlow module: Based on the executor's machine learning framework, initialize and return the model for training
         
         """
+#         这个function没看懂
         assert self.args.engine == commons.PYTORCH, "Please override this function to define non-PyTorch models"
         model = init_model()
         model = model.to(device=self.device)
@@ -107,6 +116,7 @@ class Executor(object):
 
         """
         train_dataset, test_dataset = init_dataset()
+#         https://github.com/SymbioticLab/FedScale/search?q=rl
         if self.task == "rl":
             return train_dataset, test_dataset
         # load data partitioner (entire_train_data)
@@ -114,6 +124,7 @@ class Executor(object):
 
         training_sets = DataPartitioner(
             data=train_dataset, args=self.args, numOfClass=self.args.num_class)
+#         https://github.com/SymbioticLab/FedScale/search?q=partition_data_helper
         training_sets.partition_data_helper(
             num_clients=self.args.num_participants, data_map_file=self.args.data_map_file)
 
@@ -124,6 +135,7 @@ class Executor(object):
         logging.info("Data partitioner completes ...")
 
         if self.task == 'nlp':
+#             https://github.com/SymbioticLab/FedScale/search?q=collate
             self.collate_fn = collate
         elif self.task == 'voice':
             self.collate_fn = voice_collate_fn
@@ -149,6 +161,7 @@ class Executor(object):
         self.event_queue.append(request)
 
     def deserialize_response(self, responses):
+#         https://stackoverflow.com/questions/3316762/what-is-deserialize-and-serialize-in-json
         """Deserialize the response from server
 
         Args:
@@ -158,9 +171,12 @@ class Executor(object):
             ServerResponse defined at job_api.proto: The deserialized response object from server.
         
         """
+#     https://docs.python.org/3/library/pickle.html 
+# 用pickle -- Python 的object serialization来实现deserialize response from server
         return pickle.loads(responses)
 
     def serialize_response(self, responses):
+#         client端在完成assigned job后， 序列化response，然后发给server端
         """Serialize the response to send to server upon assigned job completion
 
         Args:
@@ -170,6 +186,7 @@ class Executor(object):
             bytes stream: The serialized response object to server.
         
         """
+#     用pickle的dumps()函数完成
         return pickle.dumps(responses)
 
     def UpdateModel(self, config):
@@ -179,6 +196,7 @@ class Executor(object):
             config (PyTorch or TensorFlow model): The broadcasted global model config
         
         """
+#         Update the worker with the configuration of broadcasted global model 
         self.update_model_handler(model=config)
 
     def Train(self, config):
@@ -193,22 +211,28 @@ class Executor(object):
         """
         client_id, train_config = config['client_id'], config['task_config']
 
+#         init model
         model = None
+#     正常处理 model 不为空的情况
         if 'model' in train_config and train_config['model'] is not None:
             model = train_config['model']
 
+#             在下面的276行
         client_conf = self.override_conf(train_config)
         train_res = self.training_handler(
             clientId=client_id, conf=client_conf, model=model)
 
         # Report execution completion meta information
         response = self.aggregator_communicator.stub.CLIENT_EXECUTE_COMPLETION(
+#             https://github.com/SymbioticLab/FedScale/blob/3fa87b55579be6d2fbfd76e5e508527873551297/fedscale/core/channels/job_api_pb2.py
             job_api_pb2.CompleteRequest(
                 client_id=str(client_id), executor_id=self.executor_id,
                 event=commons.CLIENT_TRAIN, status=True, msg=None,
                 meta_result=None, data_result=None
             )
         )
+#         142行
+#         https://github.com/SymbioticLab/FedScale/blob/88ea51a967bc277bdd64a1734cd595e1868063b2/fedscale/core/execution/executor.py#L79:~:text=def%20dispatch_worker_events(self%2C%20request)%3A
         self.dispatch_worker_events(response)
 
         return client_id, train_res
@@ -220,6 +244,7 @@ class Executor(object):
             config (dictionary): The client testing config.
         
         """
+#         338行
         test_res = self.testing_handler(args=self.args)
         test_res = {'executorId': self.this_rank, 'results': test_res}
 
@@ -231,11 +256,13 @@ class Executor(object):
                 meta_result=None, data_result=self.serialize_response(test_res)
             )
         )
+#         142行
         self.dispatch_worker_events(response)
 
     def Stop(self):
         """Stop the current executor
         """
+#         https://github.com/SymbioticLab/FedScale/search?q=ClientConnections
         self.aggregator_communicator.close_sever_connection()
         self.received_stop_request = True
 
@@ -287,7 +314,7 @@ class Executor(object):
 
         for key in config:
             default_conf[key] = config[key]
-
+# https://stackoverflow.com/questions/11315010/what-do-and-before-a-variable-name-mean-in-a-function-signature
         return Namespace(**default_conf)
 
     def get_client_trainer(self, conf):
@@ -300,6 +327,7 @@ class Executor(object):
             Client: A abstract base client class with runtime config conf.
 
         """
+#         跳到from fedscale.core.execution.client import Client
         return Client(conf)
 
     def training_handler(self, clientId, conf, model=None):
@@ -318,6 +346,8 @@ class Executor(object):
 
         conf.clientId, conf.device = clientId, self.device
         conf.tokenizer = tokenizer
+#         https://github.com/SymbioticLab/FedScale/blob/3fa87b55579be6d2fbfd76e5e508527873551297/fedscale/core/execution/rlclient.py
+# rl还是没明白是什么意思
         if self.args.task == "rl":
             client_data = self.training_sets
             client = RLClient(conf)
@@ -333,6 +363,7 @@ class Executor(object):
             train_res = client.train(
                 client_data=client_data, model=client_model, conf=conf)
 
+#             training result
         return train_res
 
     def testing_handler(self, args):
@@ -351,6 +382,7 @@ class Executor(object):
         if self.task == 'rl':
             client = RLClient(args)
             test_res = client.test(args, self.this_rank, model, device=device)
+#             前三个变量不需要了，只要最后一个testResults
             _, _, _, testResults = test_res
         else:
             data_loader = select_dataset(self.this_rank, self.testing_sets,
@@ -373,6 +405,8 @@ class Executor(object):
             logging.info("After aggregation round {}, CumulTime {}, eval_time {}, test_loss {}, test_accuracy {:.2f}%, test_5_accuracy {:.2f}% \n"
                          .format(self.round, round(time.time() - self.start_run_time, 4), round(time.time() - evalStart, 4), test_loss, acc*100., acc_5*100.))
 
+#             python garbage collection
+#             https://docs.python.org/3/library/gc.html#gc.collect
         gc.collect()
 
         return testResults
@@ -400,7 +434,10 @@ class Executor(object):
     def client_ping(self):
         """Ping the aggregator for new task
         """
-        response = self.aggregator_communicator.stub.CLIENT_PING(job_api_pb2.PingRequest(
+#         aggregator_communicator.stub
+#         https://github.com/SymbioticLab/FedScale/blob/3fa87b55579be6d2fbfd76e5e508527873551297/fedscale/core/channels/channel_context.py#:~:text=self.stub%20%3D%20job_api_pb2_grpc.JobServiceStub(self.channel)
+# https://github.com/SymbioticLab/FedScale/blob/b31f072ae9cb2eeb63a49946bbf1946ffd942227/fedscale/core/channels/job_api_pb2.py       
+            response = self.aggregator_communicator.stub.CLIENT_PING(job_api_pb2.PingRequest(
             client_id=self.executor_id,
             executor_id=self.executor_id
         ))
