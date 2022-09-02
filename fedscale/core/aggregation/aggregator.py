@@ -4,6 +4,8 @@ import pickle
 import threading
 from concurrent import futures
 
+# The concurrent, threading, and grpc modules are used to create a distributed training system. 
+
 import grpc
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -41,7 +43,15 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         # ======== model and data ========
         self.model = None
+#         is used to keep track of the number of models that are being updated,
+# so that 1.the training can be stopped if all of the models have been updated.
+# 2. the training can be stopped if there is a model that is not able to be updated.
+
         self.model_in_update = 0
+#         is used to prevent two threads from updating the model at the same time.
+# if two threads were trying to update the weights of the same neuron at the same time. 
+# This could cause the weights to become corrupt or the training to fail.
+
         self.update_lock = threading.Lock()
         # all weights including bias/#_batch_tracked (e.g., state_dict)
         self.model_weights = collections.OrderedDict()
@@ -115,6 +125,9 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         torch.cuda.manual_seed_all(seed)
         np.random.seed(seed)
         random.seed(seed)
+#         setting the cudnn backend to be deterministic. 
+# This means that the cudnn backend will always produce the same results.
+# This is important for reproducibility.
         torch.backends.cudnn.deterministic = True
 
     def init_control_communication(self):
@@ -123,14 +136,17 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
         """
         logging.info(f"Initiating control plane communication ...")
         if self.experiment_mode == commons.SIMULATION_MODE:
+#             keep track of the number of executors in the system
             num_of_executors = 0
+
             for ip_numgpu in self.args.executor_configs.split("="):
+#            splits the string into a list of ip:numgpu strings
                 ip, numgpu = ip_numgpu.split(':')
                 for numexe in numgpu.strip()[1:-1].split(','):
                     for _ in range(int(numexe.strip())):
                         num_of_executors += 1
             self.executors = list(range(num_of_executors))
-        else:
+        else: #change the the number of executors in the real mode, to the number of participants.
             self.executors = list(range(self.args.num_participants))
 
         # initiate a server process
@@ -147,17 +163,21 @@ class Aggregator(job_api_pb2_grpc.JobServiceServicer):
 
         logging.info(f'%%%%%%%%%% Opening aggregator sever using port {port} %%%%%%%%%%')
 
+#         The gRPC server uses the port to communicate with the executors.
         self.grpc_server.add_insecure_port(port)
         self.grpc_server.start()
 
     def init_data_communication(self):
         """For jumbo traffics (e.g., training results).
         """
+#     jumbo trafficsis data that is too large to be sent over a network.
         pass
 
     def init_model(self):
         """Load the model architecture
         """
+#          is to make sure that the engine is set to PyTorch. 
+#  the code is only written for PyTorch models. The code will not work for non-PyTorch models.
         assert self.args.engine == commons.PYTORCH, "Please define model for non-PyTorch models"
 
         self.model = init_model()
