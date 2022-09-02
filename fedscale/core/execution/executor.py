@@ -2,15 +2,22 @@
 import collections
 import gc
 import pickle
+# The argparse module makes it easy to write user-friendly command-line interfaces.
+# The argparse module also automatically generates help and usage messages # and issues errors when users give the program invalid arguments.
 from argparse import Namespace
 
 import torch
-
+# This package contains the generated classes and enums for the Google Protobuf API for the job API.
 import fedscale.core.channels.job_api_pb2 as job_api_pb2
+
+
 from fedscale.core import commons
+#  is used to manage client connections.
 from fedscale.core.channels.channel_context import ClientConnections
+# is used to submit jobs to the server.
 from fedscale.core.execution.client import Client
 from fedscale.core.execution.data_processor import collate, voice_collate_fn
+#  is used to submit jobs to the server using reinforcement learning.
 from fedscale.core.execution.rlclient import RLClient
 from fedscale.core.logger.execution import *
 
