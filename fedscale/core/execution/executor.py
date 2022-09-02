@@ -29,7 +29,7 @@ class Executor(object):
             'cpu')
         self.num_executors = args.num_executors
         # ======== env information ========
-        self.this_rank = args.this_rank
+        self.this_rank = args.this_rank  
         self.executor_id = str(self.this_rank)
 
         # ======== model and data ========
@@ -42,11 +42,11 @@ class Executor(object):
             args.ps_ip, args.ps_port)
 
         # ======== runtime information ========
-        self.collate_fn = None
-        self.task = args.task
-        self.round = 0
-        self.start_run_time = time.time()
-        self.received_stop_request = False
+        self.collate_fn = None #The function used to collate data.
+        self.task = args.task  #task name
+        self.round = 0  # the round number 
+        self.start_run_time = time.time()  #The time when the executor starts running.
+        self.received_stop_request = False  # A flag indicating whether the executor has received a stop request.
         self.event_queue = collections.deque()
 
         super(Executor, self).__init__()
