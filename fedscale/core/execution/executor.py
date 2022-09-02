@@ -452,3 +452,22 @@ class Executor(object):
 if __name__ == "__main__":
     executor = Executor(args)
     executor.run()
+
+    
+#     The run function is used to start the executor. 
+# This is done by first setting up the environment, then setting up the communication, 
+# and then initializing the model. Next, the data is initialized and the training is started.
+# Finally, the testing is started and the results are reported.
+
+# The environment is set up by creating a ClientConnections object and a Client object.
+# The communication is set up by calling the init_control_communication and 
+# init_data_communication functions. The model is initialized by calling the init_model function.
+
+# The data is initialized by calling the init_data function.
+# This function loads the data from the data_dir directory. 
+# The training is started by calling the train function. 
+# This function trains the model using the training data.
+# The testing is started by calling the test function. 
+# This function tests the model using the test data. 
+# The results are reported by calling the report_executor_info_handler function.
+# This function reports the results to the aggregator.
