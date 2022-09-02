@@ -131,6 +131,7 @@ class Executor(object):
         return training_sets, testing_sets
 
     def run(self):
+#          The run function is used to start the training and testing process.
         """Start running the executor by setting up execution and communication environment, and monitoring the grpc message.
         """
         self.setup_env()
